@@ -1,0 +1,139 @@
+blueprint:
+  name: Anwesenheits-Steuerung
+  description: >
+    Führt beliebige Aktionen aus, wenn Personen kommen oder gehen
+  domain: automation
+  input:
+    presence_trigger:
+      name: Anwesenheits-Auslöser
+      description: Wähle hier deine Tracker UND den passenden Button für dieses Szenario.
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: device_tracker
+            - domain: person
+            - domain: input_boolean
+            - domain: binary_sensor
+            - domain: input_button
+          
+    presence_state:
+      name: Wenn
+      description: Wähle das Szenario für diese Automation.
+      selector:
+        select:
+          options:
+            - label: "jemand nach Hause kommt"
+              value: "home_any"
+            - label: "die erste Person nach Hause kommt"
+              value: "home_first"
+            - label: "jemand das Haus verlässt"
+              value: "not_home_any"
+            - label: "alle das Haus verlassen haben"
+              value: "not_home_last"
+
+    time_condition:
+      name: Bedingung
+      selector:
+        select:
+          options:
+            - label: "Immer ausführen"
+              value: "always"
+            - label: "Nur bei Nacht"
+              value: "night_only"
+            - label: "Nur bei Tag"
+              value: "day_only"
+      default: "always"
+
+    additional_conditions:
+      name: "Aber nur wenn"
+      selector:
+        condition: {}
+      default: []
+
+    actions_to_execute:
+      name: Aktionen
+      selector:
+        action: {}
+      default: []
+
+mode: restart
+
+variables:
+  presence_entities: !input presence_trigger
+  presence_state: !input presence_state
+  time_condition: !input time_condition
+
+trigger:
+  - platform: state
+    entity_id: !input presence_trigger
+
+condition:
+  # Filtert GPS-Updates ohne Statuswechsel (außer bei Buttons, die haben immer Statuswechsel)
+  - condition: template
+    value_template: >
+      {{ trigger.to_state.domain == 'input_button' or
+         trigger.from_state.state != trigger.to_state.state }}
+
+  # Zeit-Bedingung
+  - condition: template
+    value_template: >
+      {{ (time_condition == 'always') or
+         (time_condition == 'night_only' and is_state('sun.sun', 'below_horizon')) or
+         (time_condition == 'day_only' and is_state('sun.sun', 'above_horizon')) }}
+  
+  # Zusätzliche Bedingungen
+  - condition: and
+    conditions: !input additional_conditions
+
+action:
+  - choose:
+      # ----------------------------------------------------------------
+      # SZENARIO: Jemand kommt (Egal wer)
+      # ----------------------------------------------------------------
+      - conditions:
+          - "{{ presence_state == 'home_any' }}"
+          - >
+            {{ trigger.to_state.domain == 'input_button' or
+               trigger.to_state.state in ['home', 'on'] }}
+        sequence: !input actions_to_execute
+
+      # ----------------------------------------------------------------
+      # SZENARIO: Der ERSTE kommt (Haus war leer)
+      # ----------------------------------------------------------------
+      - conditions:
+          - "{{ presence_state == 'home_first' }}"
+          # Trigger muss Anwesend sein (oder Button)
+          - >
+            {{ trigger.to_state.domain == 'input_button' or
+               trigger.to_state.state in ['home', 'on'] }}
+          # Und: Es muss wirklich der Erste sein (Count == 1) ODER Button (Override)
+          - >
+            {{ trigger.to_state.domain == 'input_button' or
+               expand(presence_entities) | selectattr('state', 'in', ['home', 'on']) | list | count == 1 }}
+        sequence: !input actions_to_execute
+
+      # ----------------------------------------------------------------
+      # SZENARIO: Jemand geht (Egal wer)
+      # ----------------------------------------------------------------
+      - conditions:
+          - "{{ presence_state == 'not_home_any' }}"
+          - >
+            {{ trigger.to_state.domain == 'input_button' or
+               trigger.to_state.state in ['not_home', 'off'] }}
+        sequence: !input actions_to_execute
+
+      # ----------------------------------------------------------------
+      # SZENARIO: Der LETZTE geht (Alle weg)
+      # ----------------------------------------------------------------
+      - conditions:
+          - "{{ presence_state == 'not_home_last' }}"
+          # Trigger muss Abwesend sein (oder Button)
+          - >
+            {{ trigger.to_state.domain == 'input_button' or
+               trigger.to_state.state in ['not_home', 'off'] }}
+          # Und: Keiner mehr da (Count == 0) ODER Button (Override)
+          - >
+            {{ trigger.to_state.domain == 'input_button' or
+               expand(presence_entities) | selectattr('state', 'in', ['home', 'on']) | list | count == 0 }}
+        sequence: !input actions_to_execute

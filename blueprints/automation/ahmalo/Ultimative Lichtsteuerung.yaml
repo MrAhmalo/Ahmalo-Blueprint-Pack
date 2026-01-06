@@ -1,0 +1,312 @@
+blueprint:
+  name: "Ultimative Lichtsteuerung"
+  description: >
+    Funktionen:<br>
+    - <b>Sonnensteuerung</b>: Schaltet präzise bei Sonnenauf- oder untergang (inkl. Zeit-Offset)<br>
+    - <b>Zeitpläne</b>: Zwei unabhängige Zeit-Slots mit Wochentags-Filter für feste Schaltzeiten<br>
+    - <b>Watchdog</b>: Intelligente Nachhol-Logik (alle 20 Min.), falls das Licht offline war<br>
+    - <b>Übersteuerungsschutz</b>: Erkennt manuelle Eingriffe und pausiert die Automatik für X Minuten<br>
+    - <b>Bedingungen</b>: Prüft vor dem Schalten z.B. Anwesenheit oder Helligkeit<br>
+    - <b>Zusatz-Aktionen</b>: Führt beim Schalten weitere benutzerdefinierte Befehle aus
+  domain: automation
+  input:
+    target_entity:
+      name: "Ziel-Entitäten"
+      selector:
+        entity:
+          domain: [light, switch]
+          multiple: true
+
+    section_times:
+      name: "Sonnen-Zeiten"
+      icon: mdi:weather-sunset
+      collapsed: true
+      input:
+        sunset_offset:
+          name: "Offset Sonnenuntergang"
+          default: "00:00:00"
+          selector:
+            duration: {}
+        sunset_state:
+          name: "Zustand bei Sonnenuntergang"
+          default: "on"
+          selector:
+            select:
+              options:
+                - {label: "Anschalten", value: "on"}
+                - {label: "Ausschalten", value: "off"}
+                - {label: "Keine Aktion", value: "none"}
+        sunrise_offset:
+          name: "Offset Sonnenaufgang"
+          default: "00:00:00"
+          selector:
+            duration: {}
+        sunrise_state:
+          name: "Zustand bei Sonnenaufgang"
+          default: "off"
+          selector:
+            select:
+              options:
+                - {label: "Anschalten", value: "on"}
+                - {label: "Ausschalten", value: "off"}
+                - {label: "Keine Aktion", value: "none"}
+
+    section_fixed_times:
+      name: "Feste Uhrzeiten (Slot 1)"
+      icon: mdi:clock-digital
+      collapsed: true
+      input:
+        enable_fixed_on:
+          name: " "
+          default: false
+          selector:
+            boolean: {}
+        fixed_time_on:
+          name: "Uhrzeit An"
+          default: "06:00:00"
+          selector:
+            time: {}
+        enable_fixed_off:
+          name: " "
+          default: false
+          selector:
+            boolean: {}
+        fixed_time_off:
+          name: "Uhrzeit Aus"
+          default: "23:00:00"
+          selector:
+            time: {}
+        days_slot_1:
+          name: "Wochentage"
+          default: [mon, tue, wed, thu, fri, sat, sun]
+          selector:
+            select:
+              multiple: true
+              options:
+                - {label: "Montag", value: "mon"}
+                - {label: "Dienstag", value: "tue"}
+                - {label: "Mittwoch", value: "wed"}
+                - {label: "Donnerstag", value: "thu"}
+                - {label: "Freitag", value: "fri"}
+                - {label: "Samstag", value: "sat"}
+                - {label: "Sonntag", value: "sun"}
+
+    section_fixed_times_2:
+      name: "Feste Uhrzeiten (Slot 2)"
+      icon: mdi:clock-time-eight
+      collapsed: true
+      input:
+        enable_fixed_on_2:
+          name: " "
+          default: false
+          selector:
+            boolean: {}
+        fixed_time_on_2:
+          name: "Uhrzeit An"
+          default: "08:00:00"
+          selector:
+            time: {}
+        enable_fixed_off_2:
+          name: " "
+          default: false
+          selector:
+            boolean: {}
+        fixed_time_off_2:
+          name: "Uhrzeit Aus"
+          default: "00:00:00"
+          selector:
+            time: {}
+        days_slot_2:
+          name: "Wochentage"
+          default: [mon, tue, wed, thu, fri, sat, sun]
+          selector:
+            select:
+              multiple: true
+              options:
+                - {label: "Montag", value: "mon"}
+                - {label: "Dienstag", value: "tue"}
+                - {label: "Mittwoch", value: "wed"}
+                - {label: "Donnerstag", value: "thu"}
+                - {label: "Freitag", value: "fri"}
+                - {label: "Samstag", value: "sat"}
+                - {label: "Sonntag", value: "sun"}
+
+    section_conditions:
+      name: "Bedingungen"
+      icon: mdi:filter-variant
+      collapsed: true
+      input:
+        condition_on:
+          name: "Bedingung für An"
+          default: []
+          selector:
+            condition: {}
+        condition_off:
+          name: "Bedingung für Aus"
+          default: []
+          selector:
+            condition: {}
+
+    section_extra_actions:
+      name: "Zusätzliche Aktionen"
+      icon: mdi:plus-box
+      collapsed: true
+      input:
+        actions_on:
+          name: "Aktionen beim Einschalten"
+          default: []
+          selector:
+            action: {}
+        actions_off:
+          name: "Aktionen beim Ausschalten"
+          default: []
+          selector:
+            action: {}
+
+    section_override:
+      name: "Übersteuerung"
+      icon: mdi:hand-back-right
+      collapsed: true
+      input:
+        manual_override_check:
+          name: "Manuelle Übersteuerung beachten"
+          description: "Deaktiviert den Watchdog für die ausgewählt Zeit, jedoch nicht die reguläre Steuerung"
+          default: true
+          selector:
+            boolean: {}
+        override_duration:
+          name: "Schutz-Dauer"
+          default: 30
+          selector:
+            number:
+              min: 1
+              max: 360
+              unit_of_measurement: "min"
+
+mode: restart
+
+trigger:
+  - platform: sun
+    event: sunset
+    offset: !input sunset_offset
+    id: "trigger_sunset"
+  - platform: sun
+    event: sunrise
+    offset: !input sunrise_offset
+    id: "trigger_sunrise"
+  - platform: time
+    at: !input fixed_time_on
+    id: "trigger_time_on_1"
+  - platform: time
+    at: !input fixed_time_off
+    id: "trigger_time_off_1"
+  - platform: time
+    at: !input fixed_time_on_2
+    id: "trigger_time_on_2"
+  - platform: time
+    at: !input fixed_time_off_2
+    id: "trigger_time_off_2"
+  - platform: time_pattern
+    minutes: "/7"
+    id: "trigger_watchdog"
+
+variables:
+  entities: !input target_entity
+  req_sunset: !input sunset_state
+  req_sunrise: !input sunrise_state
+  use_on_1: !input enable_fixed_on
+  time_on_1: !input fixed_time_on
+  use_off_1: !input enable_fixed_off
+  time_off_1: !input fixed_time_off
+  days_1: !input days_slot_1
+  use_on_2: !input enable_fixed_on_2
+  time_on_2: !input fixed_time_on_2
+  use_off_2: !input enable_fixed_off_2
+  time_off_2: !input fixed_time_off_2
+  days_2: !input days_slot_2
+  override_enabled: !input manual_override_check
+  override_min: !input override_duration
+
+action:
+  - condition: template
+    value_template: >
+      {% if trigger.id == 'trigger_watchdog' and override_enabled %}
+        {% set limit = now() - timedelta(minutes=override_min) %}
+        {% set recently_changed = expand(entities) | selectattr('last_changed', 'gt', limit) | list | length > 0 %}
+        {{ not recently_changed }}
+      {% else %}
+        true
+      {% endif %}
+
+  - choose:
+      # --- ANSCHALTEN ---
+      - conditions:
+          - or:
+              - "{{ trigger.id == 'trigger_sunset' and req_sunset == 'on' }}"
+              - "{{ trigger.id == 'trigger_sunrise' and req_sunrise == 'on' }}"
+              - "{{ trigger.id == 'trigger_time_on_1' and use_on_1 and now().strftime('%a')[:3].lower() in days_1 }}"
+              - "{{ trigger.id == 'trigger_time_on_2' and use_on_2 and now().strftime('%a')[:3].lower() in days_2 }}"
+              - and:
+                  - "{{ trigger.id == 'trigger_watchdog' }}"
+                  - "{{ req_sunset == 'on' }}"
+                  - condition: sun
+                    after: sunset
+                    after_offset: !input sunset_offset
+                  - condition: template
+                    value_template: >
+                      {% set t_now = now() %}
+                      {% set day = t_now.strftime('%a')[:3].lower() %}
+                      {# Logik für Slot 1 #}
+                      {% set t_off_1 = today_at(time_off_1) %}
+                      {% if t_off_1 < today_at("12:00") and t_now > today_at("12:00") %}
+                        {% set t_off_1 = t_off_1 + timedelta(days=1) %}
+                      {% endif %}
+                      {% set off_1_reached = use_off_1 and day in days_1 and t_now >= t_off_1 %}
+                      {# Logik für Slot 2 #}
+                      {% set t_off_2 = today_at(time_off_2) %}
+                      {% if t_off_2 < today_at("12:00") and t_now > today_at("12:00") %}
+                        {% set t_off_2 = t_off_2 + timedelta(days=1) %}
+                      {% endif %}
+                      {% set off_2_reached = use_off_2 and day in days_2 and t_now >= t_off_2 %}
+                      {{ not off_1_reached and not off_2_reached }}
+        sequence:
+          - condition: !input condition_on
+          - service: homeassistant.turn_on
+            target: { entity_id: !input target_entity }
+          - choose: []
+            default: !input actions_on
+
+      # --- AUSSCHALTEN ---
+      - conditions:
+          - or:
+              - "{{ trigger.id == 'trigger_sunset' and req_sunset == 'off' }}"
+              - "{{ trigger.id == 'trigger_sunrise' and req_sunrise == 'off' }}"
+              - "{{ trigger.id == 'trigger_time_off_1' and use_off_1 and now().strftime('%a')[:3].lower() in days_1 }}"
+              - "{{ trigger.id == 'trigger_time_off_2' and use_off_2 and now().strftime('%a')[:3].lower() in days_2 }}"
+              - and:
+                  - "{{ trigger.id == 'trigger_watchdog' }}"
+                  - or:
+                      - and:
+                          - "{{ req_sunrise == 'off' }}"
+                          - condition: sun
+                            after: sunrise
+                            after_offset: !input sunrise_offset
+                      - condition: template
+                        value_template: >
+                          {% set t_now = now() %}
+                          {% set day = t_now.strftime('%a')[:3].lower() %}
+                          {% set t_off_1 = today_at(time_off_1) %}
+                          {# Zeit gilt nur als erreicht, wenn wir nach der Uhrzeit sind UND (entweder es ist Nachmittag oder die Zeit ist vormittags und wir sind auch noch vormittags) #}
+                          {{ use_off_1 and day in days_1 and t_now >= t_off_1 and (t_now < today_at("12:00") if t_off_1 < today_at("12:00") else true) }}
+                      - condition: template
+                        value_template: >
+                          {% set t_now = now() %}
+                          {% set day = t_now.strftime('%a')[:3].lower() %}
+                          {% set t_off_2 = today_at(time_off_2) %}
+                          {{ use_off_2 and day in days_2 and t_now >= t_off_2 and (t_now < today_at("12:00") if t_off_2 < today_at("12:00") else true) }}
+        sequence:
+          - condition: !input condition_off
+          - service: homeassistant.turn_off
+            target: { entity_id: !input target_entity }
+          - choose: []
+            default: !input actions_off

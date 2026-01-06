@@ -1,0 +1,171 @@
+blueprint:
+  name: Adaptives Licht (FINAL - Smart Polling)
+  description: >
+    Prüft alle paar Sekunden die Lampen. Korrigiert beim Einschalten sofort.
+    Respektiert manuelle Änderungen, wenn die Abweichung groß ist.
+  domain: automation
+  input:
+    target_label:
+      name: Licht-Label
+      description: Das Label deiner Lampen.
+      selector:
+        label:
+          multiple: false
+
+    poll_interval:
+      name: Prüf-Intervall (Sekunden)
+      description: "Wie oft prüfen? (Empfehlung: 5s)"
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: "s"
+
+    manual_threshold:
+      name: Toleranz für manuellen Eingriff
+      description: >
+        Wenn die aktuelle Helligkeit um mehr als diesen Wert vom Ziel abweicht,
+        wird die Lampe nicht automatisch angepasst.
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 50
+          unit_of_measurement: "%"
+
+    force_time:
+      name: Erzwingen beim Einschalten (Sekunden)
+      description: >
+        In diesem Zeitraum nach dem Einschalten wird die Helligkeit immer
+        erzwungen, um den Startwert zu korrigieren.
+      default: 15
+      selector:
+        number:
+          min: 0
+          max: 60
+          unit_of_measurement: "s"
+
+    section_times:
+      name: "🕒 Uhrzeiten & Helligkeit"
+      collapsed: false
+      input:
+        brightness_morning:
+          name: Helligkeit Morgen
+          default: 20
+          selector:
+            number:
+              min: 1
+              max: 100
+              unit_of_measurement: "%"
+        time_morning:
+          name: Zeit Morgen
+          default: "07:00:00"
+          selector:
+            time: {}
+
+        brightness_noon:
+          name: Helligkeit Mittag
+          default: 100
+          selector:
+            number:
+              min: 1
+              max: 100
+              unit_of_measurement: "%"
+        time_noon:
+          name: Zeit Mittag
+          default: "13:00:00"
+          selector:
+            time: {}
+
+        brightness_evening:
+          name: Helligkeit Abend
+          default: 40
+          selector:
+            number:
+              min: 1
+              max: 100
+              unit_of_measurement: "%"
+        time_evening:
+          name: Zeit Abend
+          default: "20:00:00"
+          selector:
+            time: {}
+
+        brightness_night:
+          name: Helligkeit Nacht
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 100
+              unit_of_measurement: "%"
+        time_night:
+          name: Zeit Nacht
+          default: "23:00:00"
+          selector:
+            time: {}
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  - platform: time_pattern
+    seconds: "/1"
+
+variables:
+  label_var: !input target_label
+  interval_sec: !input poll_interval
+  threshold_var: !input manual_threshold
+  force_time_var: !input force_time
+  t_m: !input time_morning
+  b_m: !input brightness_morning
+  t_n: !input time_noon
+  b_n: !input brightness_noon
+  t_e: !input time_evening
+  b_e: !input brightness_evening
+  t_nt: !input time_night
+  b_nt: !input brightness_night
+  ts_now: "{{ as_timestamp(now()) }}"
+  ts_m: "{{ as_timestamp(today_at(t_m)) }}"
+  ts_n: "{{ as_timestamp(today_at(t_n)) }}"
+  ts_e: "{{ as_timestamp(today_at(t_e)) }}"
+  ts_nt: "{{ as_timestamp(today_at(t_nt)) }}"
+  target_brightness: >
+    {% if ts_m <= ts_now < ts_n %}
+      {% set p = (ts_now - ts_m) / (ts_n - ts_m) %}
+      {{ (b_m + (b_n - b_m) * p) | int }}
+    {% elif ts_n <= ts_now < ts_e %}
+      {% set p = (ts_now - ts_n) / (ts_e - ts_n) %}
+      {{ (b_n + (b_e - b_n) * p) | int }}
+    {% elif ts_e <= ts_now < ts_nt %}
+      {% set p = (ts_now - ts_e) / (ts_nt - ts_e) %}
+      {{ (b_e + (b_nt - b_e) * p) | int }}
+    {% else %}
+      {{ b_nt | int }}
+    {% endif %}
+  active_lights: "{{ label_entities(label_var) | select('is_state', 'on') | list }}"
+
+action:
+  - condition: template
+    value_template: "{{ (now().second % (interval_sec | int)) == 0 }}"
+  - condition: template
+    value_template: "{{ active_lights | count > 0 }}"
+  - repeat:
+      for_each: "{{ active_lights }}"
+      sequence:
+        - variables:
+            current_entity: "{{ repeat.item }}"
+            current_pct: "{{ (state_attr(current_entity, 'brightness') | float(0) / 255.0 * 100.0) | round(0) | int }}"
+            diff: "{{ (current_pct - target_brightness) | abs }}"
+            last_changed_sec: "{{ (now() - states[current_entity].last_changed).total_seconds() }}"
+            should_update: >
+              {{ last_changed_sec < (force_time_var | int) or diff <= (threshold_var | int) }}
+        - if: "{{ should_update }}"
+          then:
+            - service: light.turn_on
+              target:
+                entity_id: "{{ current_entity }}"
+              data:
+                brightness_pct: "{{ target_brightness }}"
+                transition: 2
