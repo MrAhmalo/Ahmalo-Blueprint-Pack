@@ -1,7 +1,14 @@
 blueprint:
   name: Anwesenheits-Steuerung
   description: >
-    Führt beliebige Aktionen aus, wenn Personen kommen oder gehen
+    Funktionen:<br>
+    - <i>v0.0.2</i><br>
+    - <b>Sonnensteuerung</b>: Schaltet präzise bei Sonnenauf- oder untergang (inkl. Zeit-Offset)<br>
+    - <b>Zeitpläne</b>: Zwei unabhängige Zeit-Slots mit Wochentags-Filter für feste Schaltzeiten<br>
+    - <b>Watchdog</b>: Intelligente Nachhol-Logik (alle 20 Min.), falls das Licht offline war<br>
+    - <b>Übersteuerungsschutz</b>: Erkennt manuelle Eingriffe und pausiert die Automatik für X Minuten<br>
+    - <b>Bedingungen</b>: Prüft vor dem Schalten z.B. Anwesenheit oder Helligkeit<br>
+    - <b>Zusatz-Aktionen</b>: Führt beim Schalten weitere benutzerdefinierte Befehle aus
   domain: automation
   input:
     presence_trigger:
