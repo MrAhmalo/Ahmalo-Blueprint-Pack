@@ -1,5 +1,5 @@
 blueprint:
-  name: Anwesenheits-Steuerung
+  name: Anwesenheitssteuerung
   description: >
     Funktionen:<br>
     - <i>v0.0.2</i><br>
