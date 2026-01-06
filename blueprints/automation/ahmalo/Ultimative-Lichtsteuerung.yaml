@@ -2,6 +2,7 @@ blueprint:
   name: "Ultimative Lichtsteuerung"
   description: >
     Funktionen:<br>
+    - <i>v0.0.2</i><br>
     - <b>Sonnensteuerung</b>: Schaltet präzise bei Sonnenauf- oder untergang (inkl. Zeit-Offset)<br>
     - <b>Zeitpläne</b>: Zwei unabhängige Zeit-Slots mit Wochentags-Filter für feste Schaltzeiten<br>
     - <b>Watchdog</b>: Intelligente Nachhol-Logik (alle 20 Min.), falls das Licht offline war<br>
