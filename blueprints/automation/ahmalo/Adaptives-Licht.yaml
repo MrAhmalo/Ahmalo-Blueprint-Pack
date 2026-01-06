@@ -1,8 +1,8 @@
 blueprint:
-  name: Adaptives Licht (FINAL - Smart Polling)
+  name: Adaptives Licht
   description: >
-    Prüft alle paar Sekunden die Lampen. Korrigiert beim Einschalten sofort.
-    Respektiert manuelle Änderungen, wenn die Abweichung groß ist.
+  Version: v0.0.1
+    Ändert die Helligkeit von Lampen basierend auf der Tageszeit.
   domain: automation
   input:
     target_label:
