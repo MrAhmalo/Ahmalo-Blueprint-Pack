@@ -3,12 +3,12 @@ blueprint:
   description: >
     Funktionen:<br>
     - <i>v0.0.2</i><br>
-    - <b>Sonnensteuerung</b>: Schaltet präzise bei Sonnenauf- oder untergang (inkl. Zeit-Offset)<br>
-    - <b>Zeitpläne</b>: Zwei unabhängige Zeit-Slots mit Wochentags-Filter für feste Schaltzeiten<br>
-    - <b>Watchdog</b>: Intelligente Nachhol-Logik (alle 20 Min.), falls das Licht offline war<br>
-    - <b>Übersteuerungsschutz</b>: Erkennt manuelle Eingriffe und pausiert die Automatik für X Minuten<br>
-    - <b>Bedingungen</b>: Prüft vor dem Schalten z.B. Anwesenheit oder Helligkeit<br>
-    - <b>Zusatz-Aktionen</b>: Führt beim Schalten weitere benutzerdefinierte Befehle aus
+    - <b>Anwesenheitserkennung</b>: Erkennt zuverlässig, wenn Personen ankommen oder gehen – inklusive manueller Knopf-Übersteuerung.<br>
+    - <b>Szenarien</b>: Bietet einfache Einstellungen für "jemand kommt", "erste Person kommt", "jemand geht" und "letzte geht".<br>
+    - <b>Zeitfilter</b>: Lässt die Automation jederzeit, nur bei Tag oder nur bei Nacht laufen – so schaltet sie nur, wenn du es möchtest.<br>
+    - <b>Bedingungen</b>: Ergänze zusätzliche Prüfungen (z. B. Helligkeit oder Anwesenheit), bevor Aktionen ausgeführt werden.<br>
+    - <b>Aktionen</b>: Führt vom Nutzer definierbare Aktionen aus (z. B. Licht, Benachrichtigungen oder Szenen).<br>
+    - <b>Zuverlässig</b>: Verhindert unnötige Auslösungen bei kurzen Standort-Updates und verhält sich robust bei schnellen Zustandsänderungen.
   domain: automation
   input:
     presence_trigger:
