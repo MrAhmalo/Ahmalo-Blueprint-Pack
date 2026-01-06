@@ -1,8 +1,6 @@
 blueprint:
   name: Adaptives Licht
-  description: >
-    Version: v0.0.1
-    Ändert die Helligkeit von Lampen basierend auf der Tageszeit.
+  description: "Ändert die Helligkeit von Lampen basierend auf der Tageszeit. (v0.0.1)"
   domain: automation
   input:
     target_label:
