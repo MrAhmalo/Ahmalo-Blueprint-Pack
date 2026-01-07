@@ -1,8 +1,8 @@
 blueprint:
   name: Anwesenheitssteuerung
   description: >
+    <i>v0.0.2</i><br>
     Funktionen:<br>
-    - <i>v0.0.2</i><br>
     - <b>Anwesenheitserkennung</b>: Erkennt zuverlässig, wenn Personen ankommen oder gehen – inklusive manueller Knopf-Übersteuerung.<br>
     - <b>Szenarien</b>: Bietet einfache Einstellungen für "jemand kommt", "erste Person kommt", "jemand geht" und "letzte geht".<br>
     - <b>Zeitfilter</b>: Lässt die Automation jederzeit, nur bei Tag oder nur bei Nacht laufen – so schaltet sie nur, wenn du es möchtest.<br>

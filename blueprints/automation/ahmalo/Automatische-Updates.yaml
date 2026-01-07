@@ -1,0 +1,199 @@
+blueprint:
+  name: "Automatische Updates"
+  description: >
+    <i>v0.0.1</i><br>
+    Funktionen:<br>
+    - <b>Automatische Updates</b>: Erkennt zuverlässig, wenn Updates verfügbar sind<br>
+    - <b>Benachrichtigung</b>: Informiert über verfügbare Updates<br>
+    - <b>Einstellungen</b>: Definiere Zeitpunkte für Update-Prüfung und Installation<br>
+  domain: automation
+  input:
+    # SEKTION 1: TIMING
+    check_time:
+      name: Startzeitpunkt
+      description: Wann soll täglich nach Updates gesucht werden?
+      default: "20:00:00"
+      selector:
+        time: {}
+
+    force_install_time:
+      name: Installationszeitpunkt
+      description: Updates werden zu dieser Zeit installiert
+      default: "04:00:00"
+      selector:
+        time: {}
+
+    # SEKTION 2: BENACHRICHTIGUNG
+    notify_devices:
+      name: Mobile Benachrichtigung
+      description: Geräte, die informiert werden sollen
+      default: []
+      selector:
+        device:
+          filter:
+            - integration: mobile_app
+          multiple: true
+
+    enable_persistent_notification:
+      name: Interne-Benachrichtigung
+      description: Benachrichtigung in Home Assistant anzeigen
+      default: true
+      selector:
+        boolean: {}
+
+    # SEKTION 3: UPDATE OPTIONEN
+    create_backup:
+      name: Vorheriges Backup
+      description: Soll vor jedem Update ein Backup erstellt werden?
+      default: false
+      selector:
+        boolean: {}
+
+    ha_restart:
+      name: Neustart nach Abschluss
+      description: Startet Home Assistant nach der Installation aller Updates neu
+      default: true
+      selector:
+        boolean: {}
+
+mode: single
+
+trigger:
+  - platform: time
+    at: !input check_time
+
+condition:
+  - condition: template
+    value_template: "{{ expand(states.update) | selectattr('state','eq','on') | list | count > 0 }}"
+
+action:
+  - variables:
+      updates_entities: "{{ expand(states.update) | selectattr('state','eq','on') | map(attribute='entity_id') | list }}"
+      updates_list: "{{ expand(states.update) | selectattr('state','eq','on') | map(attribute='name') | list }}"
+      updates_count: "{{ updates_list | count }}"
+      updates_text: "{{ updates_list | join(', ') }}"
+      devices: !input notify_devices
+      use_persistent: !input enable_persistent_notification
+
+  # 1. UI Benachrichtigung (falls aktiviert)
+  - if:
+      - "{{ use_persistent }}"
+    then:
+      - action: persistent_notification.create
+        data:
+          title: "Update-Check: {{ updates_count }} verfügbar"
+          message: "Folgende Updates stehen bereit: {{ updates_text }}"
+          notification_id: "auto_update_status"
+
+  # 2. Mobile Benachrichtigung (für jedes gewählte Gerät)
+  - repeat:
+      for_each: "{{ devices }}"
+      sequence:
+        - action: "notify.mobile_app_{{ device_entities(repeat.item) | map('regex_replace', 'notify\\.', '') | first }}"
+          data:
+            title: "🔄 Updates verfügbar"
+            message: "{{ updates_count }} Updates gefunden: {{ updates_text }}"
+            data:
+              actions:
+                - action: INSTALL_UPDATES
+                  title: "Sofort installieren"
+                - action: ABORT_UPDATES
+                  title: "Abbrechen"
+
+  # 3. Warten auf User-Input oder Zwangs-Zeit
+  - wait_for_trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: INSTALL_UPDATES
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: ABORT_UPDATES
+      - platform: time
+        at: !input force_install_time
+    timeout: "24:00:00"
+
+  # 4. Verarbeitung
+  - choose:
+      # FALL: User bricht ab
+      - conditions:
+          - condition: template
+            value_template: "{{ wait.trigger is defined and wait.trigger.platform == 'event' and wait.trigger.event.data.action == 'ABORT_UPDATES' }}"
+        sequence:
+          - if:
+              - "{{ use_persistent }}"
+            then:
+              - action: persistent_notification.create
+                data:
+                  message: "Installation wurde manuell abgebrochen."
+                  notification_id: "auto_update_status"
+
+      # FALL: Installation (OK gedrückt oder Zeit abgelaufen)
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: template
+                value_template: "{{ wait.trigger is defined and wait.trigger.platform == 'event' and wait.trigger.event.data.action == 'INSTALL_UPDATES' }}"
+              - condition: template
+                value_template: "{{ wait.trigger is not defined or wait.trigger.platform == 'time' or wait.remaining == 0 }}"
+        sequence:
+          # Start-Meldung in UI
+          - if:
+              - "{{ use_persistent }}"
+            then:
+              - action: persistent_notification.create
+                data:
+                  message: "Installation von {{ updates_count }} Updates läuft..."
+                  notification_id: "auto_update_status"
+
+          # INSTALLATION (Runde 1)
+          - repeat:
+              for_each: "{{ updates_entities }}"
+              sequence:
+                - action: update.install
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    backup: !input create_backup
+                - delay: seconds: 15
+
+          # Puffer und Runde 2 (für vergessene Abhängigkeiten)
+          - delay: minutes: 1
+          - repeat:
+              for_each: "{{ expand(states.update) | selectattr('state','eq','on') | map(attribute='entity_id') | list }}"
+              sequence:
+                - action: update.install
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    backup: !input create_backup
+                - delay: seconds: 10
+
+          # Ergebnis prüfen
+          - variables:
+              failed: "{{ expand(states.update) | selectattr('state','eq','on') | map(attribute='name') | list }}"
+          
+          - if:
+              - "{{ failed | count == 0 }}"
+            then:
+              - if:
+                  - "{{ use_persistent }}"
+                then:
+                  - action: persistent_notification.dismiss
+                    data:
+                      notification_id: "auto_update_status"
+              - if:
+                  - condition: template
+                    value_template: !input ha_restart
+                then:
+                  - action: homeassistant.restart
+            else:
+              - if:
+                  - "{{ use_persistent }}"
+                then:
+                  - action: persistent_notification.create
+                    data:
+                      title: "❌ Updates fehlgeschlagen"
+                      message: "Folgende Updates konnten nicht installiert werden: {{ failed | join(', ') }}"
+                      notification_id: "auto_update_status"
