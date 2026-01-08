@@ -1,22 +1,24 @@
 blueprint:
   name: Adaptives Licht
   description: >
-    <i>v0.0.1</i><br>
     Funktionen:<br>
     - <b>Automatische Helligkeit</b>: Passt die Helligkeit basierend auf der Tageszeit an<br>
     - <b>Einstellungen</b>: Definiere Zeitpunkte für Helligkeit und Prüfintervall<br>
+    <br>
+    <i>v0.0.3</i><br>
+    <i>Made by Ahmalo</i>
   domain: automation
   input:
     target_label:
       name: Licht-Label
-      description: Das Label deiner Lampen.
+      description: Label der Lichter, die angepasst werden sollen.
       selector:
         label:
           multiple: false
 
     poll_interval:
-      name: Prüf-Intervall (Sekunden)
-      description: "Wie oft prüfen? (Empfehlung: 5s)"
+      name: Prüf-Intervall
+      description: "Bestimmt das Intervall, in dem die Helligkeit angepasst wird."
       default: 5
       selector:
         number:
@@ -37,7 +39,7 @@ blueprint:
           unit_of_measurement: "%"
 
     force_time:
-      name: Erzwingen beim Einschalten (Sekunden)
+      name: Erzwingen beim Einschalten
       description: >
         In diesem Zeitraum nach dem Einschalten wird die Helligkeit immer
         erzwungen, um den Startwert zu korrigieren.
@@ -49,7 +51,7 @@ blueprint:
           unit_of_measurement: "s"
 
     section_times:
-      name: "🕒 Uhrzeiten & Helligkeit"
+      name: "Uhrzeiten & Helligkeit"
       collapsed: false
       input:
         brightness_morning:
@@ -114,6 +116,9 @@ max_exceeded: silent
 trigger:
   - platform: time_pattern
     seconds: "/1"
+  - platform: state
+    entity_id: !input target_label
+    to: "on"
 
 variables:
   label_var: !input target_label
@@ -134,19 +139,19 @@ variables:
   ts_e: "{{ as_timestamp(today_at(t_e)) }}"
   ts_nt: "{{ as_timestamp(today_at(t_nt)) }}"
   target_brightness: >
-    {% if ts_m <= ts_now < ts_n %}
+    {% if ts_m <= ts_now < ts_n and (ts_n - ts_m) > 0 %}
       {% set p = (ts_now - ts_m) / (ts_n - ts_m) %}
-      {{ (b_m + (b_n - b_m) * p) | int }}
-    {% elif ts_n <= ts_now < ts_e %}
+      {{ ((b_m + (b_n - b_m) * p) | round(0)) | int }}
+    {% elif ts_n <= ts_now < ts_e and (ts_e - ts_n) > 0 %}
       {% set p = (ts_now - ts_n) / (ts_e - ts_n) %}
-      {{ (b_n + (b_e - b_n) * p) | int }}
-    {% elif ts_e <= ts_now < ts_nt %}
+      {{ ((b_n + (b_e - b_n) * p) | round(0)) | int }}
+    {% elif ts_e <= ts_now < ts_nt and (ts_nt - ts_e) > 0 %}
       {% set p = (ts_now - ts_e) / (ts_nt - ts_e) %}
-      {{ (b_e + (b_nt - b_e) * p) | int }}
+      {{ ((b_e + (b_nt - b_e) * p) | round(0)) | int }}
     {% else %}
       {{ b_nt | int }}
     {% endif %}
-  active_lights: "{{ label_entities(label_var) | select('is_state', 'on') | list }}"
+  active_lights: "{{ label_entities(label_var) | select('match', '^light\\.') | select('is_state', 'on') | list }}"
 
 action:
   - condition: template
@@ -158,12 +163,14 @@ action:
       sequence:
         - variables:
             current_entity: "{{ repeat.item }}"
-            current_pct: "{{ (state_attr(current_entity, 'brightness') | float(0) / 255.0 * 100.0) | round(0) | int }}"
-            diff: "{{ (current_pct - target_brightness) | abs }}"
-            last_changed_sec: "{{ (now() - states[current_entity].last_changed).total_seconds() }}"
-            should_update: >
-              {{ last_changed_sec < (force_time_var | int) or diff <= (threshold_var | int) }}
-        - if: "{{ should_update }}"
+            brightness_attr: "{{ state_attr(current_entity, 'brightness') | default(0) }}"
+            current_pct: "{{ ((brightness_attr | float(0) / 255.0) * 100.0) | round(0) | int(0) }}"
+            diff: "{{ ((current_pct - target_brightness) | abs) | int(0) }}"
+            last_changed_sec: "{{ ((now() - states[current_entity].last_changed).total_seconds()) | int(0) }}"
+            is_forced: "{{ last_changed_sec < (force_time_var | int) }}"
+            is_within_threshold: "{{ diff <= (threshold_var | int) }}"
+            should_update: "{{ is_forced or is_within_threshold }}"
+        - if: "{{ should_update and (target_brightness | default(0) | int) > 0 }}"
           then:
             - service: light.turn_on
               target:
