@@ -12,4 +12,4 @@
 
 ### Importiere Automatische-Updates
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://raw.githubusercontent.com/MrAhmalo/Ahmalo-Blueprint-Pack/refs/heads/main/blueprints/automation/ahmalo/Automatische-Updates.yaml)
-*Neuste Version: v0.0.5*
+*Neuste Version: v0.0.6*
