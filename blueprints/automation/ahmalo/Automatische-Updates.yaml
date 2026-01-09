@@ -8,7 +8,7 @@ blueprint:
     - <b>Benachrichtigung</b>: Informiert über verfügbare Updates<br>
     - <b>Einstellungen</b>: Definiere Zeitpunkte für Update-Prüfung und Installation<br>
     <br>
-    <i>v0.0.6</i><br>
+    <i>v0.0.5</i><br>
     <i>Made by Ahmalo</i>
   domain: automation
   input:
@@ -30,7 +30,7 @@ blueprint:
     # SEKTION 2: BENACHRICHTIGUNG
     notify_devices:
       name: Mobile Benachrichtigung
-      description: Geräte, die informiert werden sollen (wählt nur Geräte mit mobile_app Integration)
+      description: Mobile Benachrichtigung
       default: []
       selector:
         device:
@@ -45,6 +45,15 @@ blueprint:
       selector:
         entity:
           domain: person
+          multiple: true
+
+    notify_services:
+      name: Klassische Notify-Services
+      description: Zusätzliche `notify`-Dienste (z. B. notify.telegram)
+      default: []
+      selector:
+        service:
+          domain: notify
           multiple: true
 
     enable_persistent_notification:
@@ -87,6 +96,7 @@ action:
       updates_text: "{{ updates_list | join(', ') }}"
       devices: !input notify_devices
       persons: !input notify_persons
+      services: !input notify_services
       use_persistent: !input enable_persistent_notification
       person_device_ids: >-
         {% set r = [] %}
@@ -116,6 +126,21 @@ action:
       for_each: "{{ all_devices }}"
       sequence:
         - action: "notify.mobile_app_{{ device_entities(repeat.item) | select('search','^notify\\.') | map('regex_replace', 'notify\\.', '') | first }}"
+          data:
+            title: "🔄 Updates verfügbar"
+            message: "{{ updates_count }} Updates gefunden: {{ updates_text }}"
+            data:
+              actions:
+                - action: INSTALL_UPDATES
+                  title: "Sofort installieren"
+                - action: ABORT_UPDATES
+                  title: "Abbrechen"
+
+  # 2b. Klassische notify-Services (optional)
+  - repeat:
+      for_each: "{{ services }}"
+      sequence:
+        - action: "{{ repeat.item }}"
           data:
             title: "🔄 Updates verfügbar"
             message: "{{ updates_count }} Updates gefunden: {{ updates_text }}"
