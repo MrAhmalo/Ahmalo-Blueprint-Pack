@@ -8,7 +8,7 @@ blueprint:
     - <b>Benachrichtigung</b>: Informiert über verfügbare Updates<br>
     - <b>Einstellungen</b>: Definiere Zeitpunkte für Update-Prüfung und Installation<br>
     <br>
-    <i>v0.0.6</i><br>
+    <i>v0.0.7</i><br>
     <i>Made by Ahmalo</i>
   domain: automation
   input:
@@ -28,33 +28,29 @@ blueprint:
         time: {}
 
     # SEKTION 2: BENACHRICHTIGUNG
-    notify_devices:
+    notify_targets:
       name: Mobile Benachrichtigung
-      description: Geräte, die informiert werden sollen (wählt nur Geräte mit mobile_app Integration)
-      default: []
+      description: Geräte, die über verfügbare Updates benachrichtigt werden sollen
+      default: {}
       selector:
-        device:
-          filter:
-            - integration: mobile_app
-          multiple: true
-
-    notify_persons:
-      name: Personen wählen
-      description: Wähle eine oder mehrere Personen; Nachrichten werden an alle Geräte dieser Person(en) gesendet
-      default: []
-      selector:
-        entity:
-          domain: person
-          multiple: true
-
-    notify_services:
-      name: Klassische Notify-Services
-      description: Zusätzliche `notify`-Dienste (z. B. notify.telegram)
-      default: []
-      selector:
-        service:
-          domain: notify
-          multiple: true
+        object:
+          fields:
+            devices:
+              selector:
+                device:
+                  filter:
+                    - integration: mobile_app
+                  multiple: true
+            persons:
+              selector:
+                entity:
+                  domain: person
+                  multiple: true
+            services:
+              selector:
+                service:
+                  domain: notify
+                  multiple: true
 
     enable_persistent_notification:
       name: Interne-Benachrichtigung
@@ -94,9 +90,10 @@ action:
       updates_list: "{{ expand(states.update) | selectattr('state','eq','on') | map(attribute='name') | list }}"
       updates_count: "{{ updates_list | count }}"
       updates_text: "{{ updates_list | join(', ') }}"
-      devices: !input notify_devices
-      persons: !input notify_persons
-      services: !input notify_services
+      targets: !input notify_targets
+      devices: "{{ (targets.devices | default([])) or [] }}"
+      persons: "{{ (targets.persons | default([])) or [] }}"
+      services: "{{ (targets.services | default([])) or [] }}"
       use_persistent: !input enable_persistent_notification
       person_device_ids: >-
         {% set r = [] %}
