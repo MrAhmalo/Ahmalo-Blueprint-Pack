@@ -35,18 +35,18 @@ blueprint:
       selector:
         object:
           fields:
-            - name: devices
+            devices:
               selector:
                 device:
                   filter:
                     - integration: mobile_app
                   multiple: true
-            - name: persons
+            persons:
               selector:
                 entity:
                   domain: person
                   multiple: true
-            - name: services
+            services:
               selector:
                 service:
                   domain: notify
