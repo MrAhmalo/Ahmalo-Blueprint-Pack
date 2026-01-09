@@ -1,20 +1,13 @@
 blueprint:
   name: "Automatische Updates"
   description: >
-    <i>v0.0.1</i><br>
-    <details>
-      <summary><b>Funktionen</b></summary>
-      <ul>
-        <li><b>Automatische Updates</b>: Erkennt zuverlässig, wenn Updates verfügbar sind</li>
-        <li><b>Benachrichtigung</b>: Informiert über verfügbare Updates</li>
-      </ul>
-    </details>
-    <details>
-      <summary><b>Einstellungen</b></summary>
-      <ul>
-        <li>Definiere Zeitpunkte für Update-Prüfung und Installation</li>
-      </ul>
-    </details>
+    Funktionen:<br>
+    - <b>Automatische Updates</b>: Erkennt zuverlässig, wenn Updates verfügbar sind<br>
+    - <b>Benachrichtigung</b>: Informiert über verfügbare Updates<br>
+    - <b>Einstellungen</b>: Definiere Zeitpunkte für Update-Prüfung und Installation<br>
+    <br>
+    <i>v0.0.4</i><br>
+    <i>Made by Ahmalo</i>
   domain: automation
   input:
     # SEKTION 1: TIMING
