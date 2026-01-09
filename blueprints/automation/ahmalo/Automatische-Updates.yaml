@@ -35,20 +35,17 @@ blueprint:
         object:
           fields:
             devices:
-              name: Geräte
               selector:
                 device:
                   filter:
                     - integration: mobile_app
                   multiple: true
             persons:
-              name: Personen
               selector:
                 entity:
                   domain: person
                   multiple: true
             services:
-              name: Notify Services
               selector:
                 action: {}
 
@@ -91,8 +88,8 @@ action:
       updates_count: "{{ updates_list | count }}"
       updates_text: "{{ updates_list | join(', ') }}"
       targets: !input notify_targets
-      devices: "{{ targets.devices if targets.devices is defined else [] }}"
-      persons: "{{ targets.persons if targets.persons is defined else [] }}"
+      devices: "{{ targets.devices if targets.devices is defined and targets.devices != none else [] }}"
+      persons: "{{ targets.persons if targets.persons is defined and targets.persons != none else [] }}"
       services: "{{ [targets.services.action] if (targets.services is defined and targets.services.action is defined) else [] }}"
       use_persistent: !input enable_persistent_notification
       person_device_ids: >-
@@ -108,7 +105,7 @@ action:
         {{ r | unique | list }}
       all_devices: "{{ (devices + person_device_ids) | unique | list }}"
 
-  # 1. UI Benachrichtigung (falls aktiviert)
+  # 1. UI Benachrichtigung
   - if:
       - "{{ use_persistent }}"
     then:
@@ -118,7 +115,7 @@ action:
           message: "Folgende Updates stehen bereit: {{ updates_text }}"
           notification_id: "auto_update_status"
 
-  # 2. Mobile Benachrichtigung
+  # 2. Mobile Benachrichtigung (für jedes Gerät)
   - repeat:
       for_each: "{{ all_devices }}"
       sequence:
@@ -133,7 +130,7 @@ action:
                 - action: ABORT_UPDATES
                   title: "Abbrechen"
 
-  # 2b. Klassische notify-Services (optional)
+  # 2b. Benachrichtigung über gewählte Services
   - repeat:
       for_each: "{{ services }}"
       sequence:
@@ -148,7 +145,7 @@ action:
                 - action: ABORT_UPDATES
                   title: "Abbrechen"
 
-  # 3. Warten auf User-Input oder Zwangs-Zeit
+  # 3. Warten auf Input oder Zeitablauf
   - wait_for_trigger:
       - platform: event
         event_type: mobile_app_notification_action
@@ -177,7 +174,7 @@ action:
                   message: "Installation wurde manuell abgebrochen."
                   notification_id: "auto_update_status"
 
-      # FALL: Installation (OK gedrückt oder Zeit abgelaufen)
+      # FALL: Installation
       - conditions:
           - condition: or
             conditions:
@@ -186,7 +183,6 @@ action:
               - condition: template
                 value_template: "{{ wait.trigger is not defined or wait.trigger.platform == 'time' or wait.remaining == 0 }}"
         sequence:
-          # Start-Meldung
           - if:
               - "{{ use_persistent }}"
             then:
