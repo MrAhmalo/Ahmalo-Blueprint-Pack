@@ -8,7 +8,7 @@ blueprint:
     - <b>Benachrichtigung</b>: Informiert über verfügbare Updates<br>
     - <b>Einstellungen</b>: Definiere Zeitpunkte für Update-Prüfung und Installation<br>
     <br>
-    <i>v0.0.4</i><br>
+    <i>v0.0.5</i><br>
     <i>Made by Ahmalo</i>
   domain: automation
   input:
@@ -28,15 +28,29 @@ blueprint:
         time: {}
 
     # SEKTION 2: BENACHRICHTIGUNG
-    notify_devices:
+    notify_targets:
       name: Mobile Benachrichtigung
-      description: Geräte, die informiert werden sollen
-      default: []
+      description: Geräte, die über verfügbare Updates benachrichtigt werden sollen
+      default: {}
       selector:
-        device:
-          filter:
-            - integration: mobile_app
-          multiple: true
+        object:
+          fields:
+            - name: devices
+              selector:
+                device:
+                  filter:
+                    - integration: mobile_app
+                  multiple: true
+            - name: persons
+              selector:
+                entity:
+                  domain: person
+                  multiple: true
+            - name: services
+              selector:
+                service:
+                  domain: notify
+                  multiple: true
 
     enable_persistent_notification:
       name: Interne-Benachrichtigung
@@ -76,8 +90,23 @@ action:
       updates_list: "{{ expand(states.update) | selectattr('state','eq','on') | map(attribute='name') | list }}"
       updates_count: "{{ updates_list | count }}"
       updates_text: "{{ updates_list | join(', ') }}"
-      devices: !input notify_devices
+      targets: !input notify_targets
+      devices: "{{ targets.devices | default([]) }}"
+      persons: "{{ targets.persons | default([]) }}"
+      services: "{{ targets.services | default([]) }}"
       use_persistent: !input enable_persistent_notification
+      person_device_ids: >-
+        {% set r = [] %}
+        {% for p in persons %}
+          {% for tracker in (state_attr(p, 'device_trackers') | default([])) %}
+            {% set dev = device_id(tracker) %}
+            {% if dev is not none %}
+              {% do r.append(dev) %}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+        {{ r | unique | list }}
+      all_devices: "{{ (devices + person_device_ids) | unique }}"
 
   # 1. UI Benachrichtigung (falls aktiviert)
   - if:
@@ -89,11 +118,26 @@ action:
           message: "Folgende Updates stehen bereit: {{ updates_text }}"
           notification_id: "auto_update_status"
 
-  # 2. Mobile Benachrichtigung (für jedes gewählte Gerät)
+  # 2. Mobile Benachrichtigung (für jedes gewählte Gerät oder alle Geräte der gewählten Personen)
   - repeat:
-      for_each: "{{ devices }}"
+      for_each: "{{ all_devices }}"
       sequence:
-        - action: "notify.mobile_app_{{ device_entities(repeat.item) | map('regex_replace', 'notify\\.', '') | first }}"
+        - action: "notify.mobile_app_{{ device_entities(repeat.item) | select('search','^notify\\.') | map('regex_replace', 'notify\\.', '') | first }}"
+          data:
+            title: "🔄 Updates verfügbar"
+            message: "{{ updates_count }} Updates gefunden: {{ updates_text }}"
+            data:
+              actions:
+                - action: INSTALL_UPDATES
+                  title: "Sofort installieren"
+                - action: ABORT_UPDATES
+                  title: "Abbrechen"
+
+  # 2b. Klassische notify-Services (optional)
+  - repeat:
+      for_each: "{{ services }}"
+      sequence:
+        - action: "{{ repeat.item }}"
           data:
             title: "🔄 Updates verfügbar"
             message: "{{ updates_count }} Updates gefunden: {{ updates_text }}"
