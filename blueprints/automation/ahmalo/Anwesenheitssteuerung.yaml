@@ -3,12 +3,10 @@ blueprint:
   description: >
     <i>v0.0.2</i><br>
     Funktionen:<br>
-    - <b>Anwesenheitserkennung</b>: Erkennt zuverlässig, wenn Personen ankommen oder gehen – inklusive manueller Knopf-Übersteuerung.<br>
-    - <b>Szenarien</b>: Bietet einfache Einstellungen für "jemand kommt", "erste Person kommt", "jemand geht" und "letzte geht".<br>
-    - <b>Zeitfilter</b>: Lässt die Automation jederzeit, nur bei Tag oder nur bei Nacht laufen – so schaltet sie nur, wenn du es möchtest.<br>
+    - <b>Anwesenheitserkennung</b>: Erkennt, wenn Personen ankommen oder gehen<br>
     - <b>Bedingungen</b>: Ergänze zusätzliche Prüfungen (z. B. Helligkeit oder Anwesenheit), bevor Aktionen ausgeführt werden.<br>
     - <b>Aktionen</b>: Führt vom Nutzer definierbare Aktionen aus (z. B. Licht, Benachrichtigungen oder Szenen).<br>
-    - <b>Zuverlässig</b>: Verhindert unnötige Auslösungen bei kurzen Standort-Updates und verhält sich robust bei schnellen Zustandsänderungen.
+    - <b>Zuverlässig</b>: Verhindert unnötige Auslösungen<br>
   domain: automation
   input:
     presence_trigger:

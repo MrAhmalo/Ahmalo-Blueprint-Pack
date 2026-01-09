@@ -1,6 +1,8 @@
 blueprint:
   name: "Automatische Updates"
   description: >
+    Automation um System- und HACS-Updates automatisch zu erkennen und zu installieren.<br>
+
     Funktionen:<br>
     - <b>Automatische Updates</b>: Erkennt zuverlässig, wenn Updates verfügbar sind<br>
     - <b>Benachrichtigung</b>: Informiert über verfügbare Updates<br>
