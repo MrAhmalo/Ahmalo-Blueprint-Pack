@@ -47,15 +47,6 @@ blueprint:
           domain: person
           multiple: true
 
-    notify_services:
-      name: Klassische Notify-Services
-      description: Zusätzliche `notify`-Dienste (z. B. notify.telegram)
-      default: []
-      selector:
-        service:
-          domain: notify
-          multiple: true
-
     enable_persistent_notification:
       name: Interne-Benachrichtigung
       description: Benachrichtigung in Home Assistant anzeigen
@@ -96,7 +87,6 @@ action:
       updates_text: "{{ updates_list | join(', ') }}"
       devices: !input notify_devices
       persons: !input notify_persons
-      services: !input notify_services
       use_persistent: !input enable_persistent_notification
       person_device_ids: >-
         {% set r = [] %}
@@ -126,21 +116,6 @@ action:
       for_each: "{{ all_devices }}"
       sequence:
         - action: "notify.mobile_app_{{ device_entities(repeat.item) | select('search','^notify\\.') | map('regex_replace', 'notify\\.', '') | first }}"
-          data:
-            title: "🔄 Updates verfügbar"
-            message: "{{ updates_count }} Updates gefunden: {{ updates_text }}"
-            data:
-              actions:
-                - action: INSTALL_UPDATES
-                  title: "Sofort installieren"
-                - action: ABORT_UPDATES
-                  title: "Abbrechen"
-
-  # 2b. Klassische notify-Services (optional)
-  - repeat:
-      for_each: "{{ services }}"
-      sequence:
-        - action: "{{ repeat.item }}"
           data:
             title: "🔄 Updates verfügbar"
             message: "{{ updates_count }} Updates gefunden: {{ updates_text }}"
