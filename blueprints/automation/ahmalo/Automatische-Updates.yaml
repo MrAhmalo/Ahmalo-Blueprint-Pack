@@ -49,10 +49,10 @@ blueprint:
 
     notify_services:
       name: Klassische Notify-Services
-      description: Zusätzliche `notify`-Dienste (z. B. notify.telegram)
+      description: Zusätzliche `notify`-Dienste (z. B. notify.telegram) — wähle `notify`-Entities
       default: []
       selector:
-        service:
+        entity:
           domain: notify
           multiple: true
 
