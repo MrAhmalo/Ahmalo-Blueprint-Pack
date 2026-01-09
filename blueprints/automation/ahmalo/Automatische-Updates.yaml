@@ -2,12 +2,13 @@ blueprint:
   name: "Automatische Updates"
   description: >
     Automation um System- und HACS-Updates automatisch zu erkennen und zu installieren.<br>
+
     Funktionen:<br>
     - <b>Automatische Updates</b>: Erkennt zuverlässig, wenn Updates verfügbar sind<br>
     - <b>Benachrichtigung</b>: Informiert über verfügbare Updates<br>
     - <b>Einstellungen</b>: Definiere Zeitpunkte für Update-Prüfung und Installation<br>
     <br>
-    <i>v0.0.7</i><br>
+    <i>v0.0.6</i><br>
     <i>Made by Ahmalo</i>
   domain: automation
   input:
@@ -27,27 +28,33 @@ blueprint:
         time: {}
 
     # SEKTION 2: BENACHRICHTIGUNG
-    notify_targets:
+    notify_devices:
       name: Mobile Benachrichtigung
-      description: Geräte, die über verfügbare Updates benachrichtigt werden sollen
-      default: {}
+      description: Geräte, die informiert werden sollen (wählt nur Geräte mit mobile_app Integration)
+      default: []
       selector:
-        object:
-          fields:
-            devices:
-              selector:
-                device:
-                  filter:
-                    - integration: mobile_app
-                  multiple: true
-            persons:
-              selector:
-                entity:
-                  domain: person
-                  multiple: true
-            services:
-              selector:
-                action: {}
+        device:
+          filter:
+            - integration: mobile_app
+          multiple: true
+
+    notify_persons:
+      name: Personen wählen
+      description: Wähle eine oder mehrere Personen; Nachrichten werden an alle Geräte dieser Person(en) gesendet
+      default: []
+      selector:
+        entity:
+          domain: person
+          multiple: true
+
+    notify_services:
+      name: Klassische Notify-Services
+      description: Zusätzliche `notify`-Dienste (z. B. notify.telegram)
+      default: []
+      selector:
+        service:
+          domain: notify
+          multiple: true
 
     enable_persistent_notification:
       name: Interne-Benachrichtigung
@@ -87,10 +94,9 @@ action:
       updates_list: "{{ expand(states.update) | selectattr('state','eq','on') | map(attribute='name') | list }}"
       updates_count: "{{ updates_list | count }}"
       updates_text: "{{ updates_list | join(', ') }}"
-      targets: !input notify_targets
-      devices: "{{ targets.devices if targets.devices is defined and targets.devices != none else [] }}"
-      persons: "{{ targets.persons if targets.persons is defined and targets.persons != none else [] }}"
-      services: "{{ [targets.services.action] if (targets.services is defined and targets.services.action is defined) else [] }}"
+      devices: !input notify_devices
+      persons: !input notify_persons
+      services: !input notify_services
       use_persistent: !input enable_persistent_notification
       person_device_ids: >-
         {% set r = [] %}
@@ -103,9 +109,9 @@ action:
           {% endfor %}
         {% endfor %}
         {{ r | unique | list }}
-      all_devices: "{{ (devices + person_device_ids) | unique | list }}"
+      all_devices: "{{ (devices + person_device_ids) | unique }}"
 
-  # 1. UI Benachrichtigung
+  # 1. UI Benachrichtigung (falls aktiviert)
   - if:
       - "{{ use_persistent }}"
     then:
@@ -115,7 +121,7 @@ action:
           message: "Folgende Updates stehen bereit: {{ updates_text }}"
           notification_id: "auto_update_status"
 
-  # 2. Mobile Benachrichtigung (für jedes Gerät)
+  # 2. Mobile Benachrichtigung (für jedes gewählte Gerät oder alle Geräte der gewählten Personen)
   - repeat:
       for_each: "{{ all_devices }}"
       sequence:
@@ -130,7 +136,7 @@ action:
                 - action: ABORT_UPDATES
                   title: "Abbrechen"
 
-  # 2b. Benachrichtigung über gewählte Services
+  # 2b. Klassische notify-Services (optional)
   - repeat:
       for_each: "{{ services }}"
       sequence:
@@ -145,7 +151,7 @@ action:
                 - action: ABORT_UPDATES
                   title: "Abbrechen"
 
-  # 3. Warten auf Input oder Zeitablauf
+  # 3. Warten auf User-Input oder Zwangs-Zeit
   - wait_for_trigger:
       - platform: event
         event_type: mobile_app_notification_action
@@ -174,7 +180,7 @@ action:
                   message: "Installation wurde manuell abgebrochen."
                   notification_id: "auto_update_status"
 
-      # FALL: Installation
+      # FALL: Installation (OK gedrückt oder Zeit abgelaufen)
       - conditions:
           - condition: or
             conditions:
@@ -183,6 +189,7 @@ action:
               - condition: template
                 value_template: "{{ wait.trigger is not defined or wait.trigger.platform == 'time' or wait.remaining == 0 }}"
         sequence:
+          # Start-Meldung in UI
           - if:
               - "{{ use_persistent }}"
             then:
@@ -203,7 +210,7 @@ action:
                 - delay:
                     seconds: 15
 
-          # Puffer und Runde 2
+          # Puffer und Runde 2 (für vergessene Abhängigkeiten)
           - delay:
               minutes: 1
           - repeat:
@@ -220,7 +227,7 @@ action:
           # Ergebnis prüfen
           - variables:
               failed: "{{ expand(states.update) | selectattr('state','eq','on') | map(attribute='name') | list }}"
-
+          
           - if:
               - "{{ failed | count == 0 }}"
             then:
